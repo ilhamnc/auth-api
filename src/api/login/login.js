@@ -1,33 +1,49 @@
+const mysql = require('mysql');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const connection = require('../../database/auth-db');
+const jwt = require('@hapi/jwt');
+const Joi = require('@hapi/joi');
+const config = require('../../config/config');
 
-async function loginUser(request, h) {
-  const { username, password } = request.payload;
+// Membuat koneksi database
+const connection = mysql.createConnection(config.development);
 
-  // Check if the user exists in the database
-  try {
-    const [rows] = await connection.query('SELECT * FROM users WHERE username = ?', [username]);
-    const user = rows[0];
-
-    if (!user) {
-      return h.response('Invalid username or password').code(401);
+// Handler untuk endpoint login
+const loginHandler = async (request, h) => {
+    const { email, password } = request.payload;
+  
+    // Validasi input menggunakan Joi
+    const schema = Joi.object({
+      email: Joi.string().email().required(),
+      password: Joi.string().min(8).required(),
+    });
+    const { error } = schema.validate(request.payload);
+    if (error) {
+      return h.response({ message: error.details[0].message }).code(400);
     }
+  
+    // Query untuk mencari data user berdasarkan email
+    const query = `SELECT * FROM users WHERE email='${email}'`;
+  
+    return new Promise((resolve, reject) => {
+      connection.query(query, async (error, results) => {
+        if (error) {
+          reject(error);
+        } else {
+          if (results.length === 0) {
+            resolve({ message: 'Email atau password salah' });
+          } else {
+            const user = results[0];
+            const match = await bcrypt.compare(password, user.password);
+            if (match) {
+              const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+              resolve({ token });
+            } else {
+              resolve({ message: 'Email atau password salah' });
+            }
+          }
+        }
+      });
+    });
+};
 
-    // Compare the provided password with the hashed password in the database
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return h.response('Invalid username or password').code(401);
-    }
-
-    // Generate JWT token
-    const token = jwt.sign({ id: user.id }, 'your_secret_key');
-
-    return { token };
-  } catch (error) {
-    return h.response(error.message).code(500);
-  }
-}
-
-module.exports = loginUser;
+module.exports = loginHandler;

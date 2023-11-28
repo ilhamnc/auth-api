@@ -12,8 +12,11 @@
   "dependencies": {
     "@hapi/hapi": "^21.3.2",
     "@hapi/joi": "^17.1.1",
+    "@hapi/jwt": "^3.2.0",
     "bcrypt": "^5.1.1",
+    "dotenv": "^16.3.1",
     "jsonwebtoken": "^9.0.2",
+    "mysql": "^2.18.1",
     "mysql2": "^3.6.5",
     "sequelize": "^6.35.1"
   }
